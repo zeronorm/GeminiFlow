@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Callable, Optional, Sequence, Tuple, Union
 
 from .gemini.client import GeminiWebClient
+from .types import ChatSession
 
 
 PathLike = Union[str, Path]
@@ -41,6 +42,7 @@ class Gemini:
         proxy: Optional[str] = None,
         debug: Optional[bool] = None,
         save_images: Optional[bool] = None,
+        chat_session: Optional[ChatSession] = None,
     ):
         image_inputs: Optional[list[ImageInput]] = None
         if images:
@@ -60,6 +62,7 @@ class Gemini:
             debug=debug if debug is not None else self.debug,
             auto_refresh_cookies=self.auto_refresh_cookies,
             save_images=True if save_images is None else save_images,
+            chat_session=chat_session,
         )
 
     async def achat(
@@ -72,6 +75,7 @@ class Gemini:
         proxy: Optional[str] = None,
         debug: Optional[bool] = None,
         save_images: Optional[bool] = None,
+        chat_session: Optional[ChatSession] = None,
     ) -> str:
         stream = await self.astream_chat(
             prompt,
@@ -81,6 +85,7 @@ class Gemini:
             proxy=proxy,
             debug=debug,
             save_images=save_images,
+            chat_session=chat_session,
         )
         parts: list[str] = []
         async for chunk in stream:
@@ -98,6 +103,7 @@ class Gemini:
         debug: Optional[bool] = None,
         on_chunk: Optional[Callable[[str], None]] = None,
         save_images: Optional[bool] = None,
+        chat_session: Optional[ChatSession] = None,
     ) -> str:
         async def _run() -> str:
             stream = await self.astream_chat(
@@ -108,6 +114,7 @@ class Gemini:
                 proxy=proxy,
                 debug=debug,
                 save_images=save_images,
+                chat_session=chat_session,
             )
             parts: list[str] = []
             async for chunk in stream:

@@ -14,6 +14,7 @@ import aiohttp_cors
 from aiohttp import web
 
 from gemini_flow import Gemini
+from gemini_flow.types import ChatSession
 from gemini_flow.cookies import load_google_cookies
 
 
@@ -135,7 +136,9 @@ def _payload_has_images(payload: dict[str, Any]) -> bool:
     return isinstance(images, list) and len(images) > 0
 
 
-async def _run_gemini_stream(*, payload: dict[str, Any]):
+async def _run_gemini_stream(
+    *, payload: dict[str, Any], chat_session: Optional[ChatSession] = None
+):
     prompt = payload.get("prompt")
     if not isinstance(prompt, str) or not prompt.strip():
         raise ValueError("prompt is required")
@@ -170,6 +173,7 @@ async def _run_gemini_stream(*, payload: dict[str, Any]):
         images=images,
         language=language,
         save_images=False,
+        chat_session=chat_session,
     )
     return stream
 
@@ -193,7 +197,12 @@ async def chat(request: web.Request) -> web.Response:
         print(f"[server] id={request_id} /chat recv <unprintable>")
 
     try:
-        stream = await _run_gemini_stream(payload=payload)
+        chat_session = ChatSession(
+            conversation_id=payload.get("conversation_id"),
+            response_id=payload.get("response_id"),
+            choice_id=payload.get("choice_id"),
+        )
+        stream = await _run_gemini_stream(payload=payload, chat_session=chat_session)
     except Exception as e:
         return _json_error(str(e), status=400)
 
@@ -227,7 +236,13 @@ async def chat(request: web.Request) -> web.Response:
         except Exception as e:
             return _json_error(str(e), status=500)
 
-    response_payload = {"text": "".join(text_parts), "images": images_saved}
+    response_payload = {
+        "text": "".join(text_parts),
+        "images": images_saved,
+        "conversation_id": chat_session.conversation_id,
+        "response_id": chat_session.response_id,
+        "choice_id": chat_session.choice_id,
+    }
     try:
         print(
             f"[server] id={request_id} /chat resp has_text={bool(response_payload['text'])} "
@@ -269,7 +284,12 @@ async def stream(request: web.Request) -> web.StreamResponse:
     await resp.prepare(request)
 
     try:
-        gemini_stream = await _run_gemini_stream(payload=payload)
+        chat_session = ChatSession(
+            conversation_id=payload.get("conversation_id"),
+            response_id=payload.get("response_id"),
+            choice_id=payload.get("choice_id"),
+        )
+        gemini_stream = await _run_gemini_stream(payload=payload, chat_session=chat_session)
         cookies = _load_download_cookies()
         has_text = False
         has_images = False
@@ -305,7 +325,16 @@ async def stream(request: web.Request) -> web.StreamResponse:
             )
         except Exception:
             pass
-        await resp.write(_sse_format(event="done", data={}))
+        await resp.write(
+            _sse_format(
+                event="done",
+                data={
+                    "conversation_id": chat_session.conversation_id,
+                    "response_id": chat_session.response_id,
+                    "choice_id": chat_session.choice_id,
+                },
+            )
+        )
     except ConnectionResetError:
         return resp
     except Exception as e:

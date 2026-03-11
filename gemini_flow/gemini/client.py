@@ -5,7 +5,7 @@ from typing import Optional, Sequence, Tuple, Union
 
 from ..cookies import load_google_cookies
 from ..playwright_cookies import ensure_playwright_cookies
-from ..types import AsyncTextStream
+from ..types import AsyncTextStream, ChatSession
 from .provider import GeminiWebProvider
 
 
@@ -31,6 +31,7 @@ class GeminiWebClient:
         debug: bool = False,
         auto_refresh_cookies: bool = True,
         save_images: bool = True,
+        chat_session: Optional[ChatSession] = None,
     ) -> AsyncTextStream:
         async def _refresh_cookies() -> None:
             await ensure_playwright_cookies(
@@ -72,6 +73,7 @@ class GeminiWebClient:
                 proxy=proxy,
                 debug=debug,
                 save_images=save_images,
+                chat_session=chat_session,
             )
         except Exception:
             if not auto_refresh_cookies:
@@ -89,4 +91,5 @@ class GeminiWebClient:
                 proxy=proxy,
                 debug=debug,
                 save_images=save_images,
+                chat_session=chat_session,
             )

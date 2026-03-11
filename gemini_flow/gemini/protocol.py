@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 from typing import Any, Dict, Iterator, Optional, Sequence, Tuple
 
-from ..types import GeminiTokens
+from ..types import GeminiTokens, ChatSession
 
 
 GEMINI_BASE_URL = "https://gemini.google.com"
@@ -62,6 +62,7 @@ class GeminiRequest:
     tokens: GeminiTokens
     model: str
     uploads: Optional[Sequence[Tuple[str, str]]] = None
+    chat_session: Optional[ChatSession] = None
 
     def params(self) -> Dict[str, str]:
         return {
@@ -73,7 +74,12 @@ class GeminiRequest:
         }
 
     def data(self) -> Dict[str, str]:
-        inner = build_request(self.prompt, self.language, uploads=self.uploads)
+        inner = build_request(
+            self.prompt,
+            self.language,
+            uploads=self.uploads,
+            chat_session=self.chat_session,
+        )
         return {
             "at": self.tokens.snlm0e,
             "f.req": json.dumps([None, json.dumps(inner)]),
@@ -102,16 +108,20 @@ def build_request(
     language: str,
     *,
     uploads: Optional[Sequence[Tuple[str, str]]] = None,
+    chat_session: Optional[ChatSession] = None,
 ) -> list:
     image_list = (
         [[[upload_ref, 1], image_name] for upload_ref, image_name in uploads]
         if uploads
         else []
     )
+    conv_id = chat_session.conversation_id if chat_session else None
+    resp_id = chat_session.response_id if chat_session else None
+    choice_id = chat_session.choice_id if chat_session else None
     return [
         [prompt, 0, None, image_list, None, None, 0],
         [language],
-        [None, None, None, None, None, []],
+        [conv_id, resp_id, choice_id, None, None, []],
         None,
         None,
         None,
@@ -132,10 +142,12 @@ def iter_response_text_chunks(full_text: str) -> Iterator[str]:
             yield delta
 
 
-def extract_text_delta_from_raw_line(raw_line: str, last_content: str) -> Tuple[Optional[str], str]:
-    """Extract incremental text delta from one StreamGenerate response line.
+def extract_text_delta_from_raw_line(
+    raw_line: str, last_content: str
+) -> Tuple[Optional[str], str, Optional[ChatSession]]:
+    """Extract incremental text delta and conversation IDs from one StreamGenerate response line.
 
-    Returns (delta, new_last_content). When the line doesn't contain text, returns (None, last_content).
+    Returns (delta, new_last_content, chat_session). When the line doesn't contain text, returns (None, last_content, None).
     """
 
     def _flatten_strings(value):
@@ -174,27 +186,50 @@ def extract_text_delta_from_raw_line(raw_line: str, last_content: str) -> Tuple[
         return None
 
     try:
+        # print(f"RAW_LINE: {raw_line}", file=__import__("sys").stderr)
+
         line = json.loads(raw_line)
     except Exception:
-        return None, last_content
+        return None, last_content, None
     if not isinstance(line, list) or not line:
-        return None, last_content
+        return None, last_content, None
+
+    chat_session = None
 
     try:
         if len(line[0]) < 3 or not line[0][2]:
-            return None, last_content
+            return None, last_content, None
         response_part = json.loads(line[0][2])
         if not response_part or len(response_part) < 5:
-            return None, last_content
+            return None, last_content, None
+
+        # Extract conversation IDs if available
+        try:
+            if isinstance(response_part[1], list) and len(response_part[1]) >= 2:
+                conv_id = response_part[1][0]
+                resp_id = response_part[1][1]
+                choice_id = None
+                if isinstance(response_part[4], list) and len(response_part[4]) > 0:
+                    if isinstance(response_part[4][0], list) and len(response_part[4][0]) > 0:
+                        choice_id = response_part[4][0][0]
+                if conv_id and resp_id and choice_id:
+                    chat_session = ChatSession(
+                        conversation_id=conv_id,
+                        response_id=resp_id,
+                        choice_id=choice_id,
+                    )
+        except Exception:
+            pass
+
         content = _extract_content(response_part)
         if not content:
-            return None, last_content
+            return None, last_content, chat_session
     except Exception:
-        return None, last_content
+        return None, last_content, chat_session
 
     if last_content and content.startswith(last_content):
-        return content[len(last_content) :], content
-    return content, content
+        return content[len(last_content) :], content, chat_session
+    return content, content, chat_session
 
 
 def extract_image_candidates_from_raw_line(raw_line: str) -> Sequence[str]:

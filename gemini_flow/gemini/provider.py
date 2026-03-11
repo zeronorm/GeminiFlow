@@ -11,7 +11,7 @@ from typing import Optional, Sequence, Tuple
 import aiohttp
 
 from ..providers.base import ChatProvider
-from ..types import AsyncTextStream, Cookies, MissingAuthError, RequestError, TokenFetchError
+from ..types import AsyncTextStream, Cookies, MissingAuthError, RequestError, TokenFetchError, ChatSession
 from .protocol import (
     DEFAULT_HEADERS,
     GEMINI_BASE_URL,
@@ -61,6 +61,7 @@ class GeminiWebProvider(ChatProvider):
         proxy: Optional[str] = None,
         debug: bool = False,
         save_images: bool = True,
+        chat_session: Optional[ChatSession] = None,
     ) -> AsyncTextStream:
         if REQUIRED_COOKIE_NAME not in cookies:
             raise MissingAuthError(f"Missing required cookie: {REQUIRED_COOKIE_NAME}")
@@ -82,6 +83,7 @@ class GeminiWebProvider(ChatProvider):
             tokens=tokens,
             model=model,
             uploads=uploads,
+            chat_session=chat_session,
         )
 
         normalized_model = model.strip().lower()
@@ -242,9 +244,13 @@ class GeminiWebProvider(ChatProvider):
                                             # Keep only the latest output candidate; save once at the end.
                                             final_image_candidate = normalized
 
-                                delta, last_content = extract_text_delta_from_raw_line(
+                                delta, last_content, new_chat_session = extract_text_delta_from_raw_line(
                                     raw_line, last_content
                                 )
+                                if new_chat_session and chat_session is not None:
+                                    chat_session.conversation_id = new_chat_session.conversation_id
+                                    chat_session.response_id = new_chat_session.response_id
+                                    chat_session.choice_id = new_chat_session.choice_id
                                 if delta:
                                     if not is_image_model or not _is_noise_text_in_image_mode(delta):
                                         emitted_any = True
@@ -268,7 +274,11 @@ class GeminiWebProvider(ChatProvider):
                         if _is_output_image_url(normalized):
                             final_image_candidate = normalized
 
-                delta, last_content = extract_text_delta_from_raw_line(raw_line, last_content)
+                delta, last_content, new_chat_session = extract_text_delta_from_raw_line(raw_line, last_content)
+                if new_chat_session and chat_session is not None:
+                    chat_session.conversation_id = new_chat_session.conversation_id
+                    chat_session.response_id = new_chat_session.response_id
+                    chat_session.choice_id = new_chat_session.choice_id
                 if delta:
                     if not is_image_model or not _is_noise_text_in_image_mode(delta):
                         emitted_any = True

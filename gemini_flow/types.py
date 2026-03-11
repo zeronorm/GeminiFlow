@@ -13,6 +13,13 @@ class GeminiTokens:
     sid: Optional[str]
 
 
+@dataclass
+class ChatSession:
+    conversation_id: Optional[str] = None
+    response_id: Optional[str] = None
+    choice_id: Optional[str] = None
+
+
 class GeminiWebFlowError(RuntimeError):
     pass
 
