@@ -34,6 +34,35 @@ python -m gemini_flow --help
 python -m pip install . --no-build-isolation
 ```
 
+## Python Import
+
+除了命令行，也可以直接作为 Python 包导入使用：
+
+```python
+from gemini_flow import Gemini, ChatSession, export_cookies, create_app
+
+cookies_path = export_cookies(output_dir="user_cookies")
+
+client = Gemini(cookies_dir="user_cookies")
+session = ChatSession()
+text = client.chat("用繁中回覆一句：測試成功", chat_session=session)
+
+app = create_app()
+```
+
+异步接口：
+
+```python
+from gemini_flow import Gemini, aexport_cookies, serve
+
+await aexport_cookies(output_dir="user_cookies")
+
+client = Gemini(cookies_dir="user_cookies")
+text = await client.achat("hello")
+
+await serve(host="127.0.0.1", port=8000)
+```
+
 ## Run
 
 ### 单轮模式（Single-turn）

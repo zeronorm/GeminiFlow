@@ -13,7 +13,7 @@ import aiohttp
 import aiohttp_cors
 from aiohttp import web
 
-from . import Gemini
+from .entrypoint import Gemini
 from .chrome_cookies import (
     detect_active_chrome_profile,
     export_gemini_cookies_from_chrome_profile_async,
@@ -464,7 +464,7 @@ def create_app() -> web.Application:
     return app
 
 
-async def _serve(*, host: str, port: int) -> None:
+async def serve(*, host: str = "127.0.0.1", port: int = 8000) -> None:
     app = create_app()
     runner = web.AppRunner(app)
     await runner.setup()
@@ -487,4 +487,4 @@ def main() -> None:
     p.add_argument("--port", type=int, default=8000)
     args = p.parse_args()
 
-    asyncio.run(_serve(host=args.host, port=args.port))
+    asyncio.run(serve(host=args.host, port=args.port))
