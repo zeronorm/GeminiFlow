@@ -5,8 +5,33 @@
 ## Install
 
 ```bash
-cd projects/gemini_flow
-python -m pip install -r requirements.txt
+python -m pip install .
+```
+
+通过 GitHub 安装：
+
+```bash
+python -m pip install "git+https://github.com/zeronorm/GeminiFlow.git"
+```
+
+开发模式：
+
+```bash
+python -m pip install -e .
+```
+
+安装后可在任意目录直接执行：
+
+```bash
+gemini-flow --help
+gemini-flow-server --help
+python -m gemini_flow --help
+```
+
+如果本机是离线环境，安装本地仓库时可加：
+
+```bash
+python -m pip install . --no-build-isolation
 ```
 
 ## Run
@@ -14,20 +39,20 @@ python -m pip install -r requirements.txt
 ### 单轮模式（Single-turn）
 
 ```bash
-python cli.py chat -c user_cookies "用繁中回覆一句：測試成功"
+gemini-flow chat -c /path/to/user_cookies "用繁中回覆一句：測試成功"
 ```
 
 Choose model:
 
 ```bash
-python cli.py chat -m gemini-3-pro -c user_cookies "用繁中回覆一句：測試成功"
-python cli.py chat -m gemini-3-flash -c user_cookies "用繁中回覆一句：測試成功"
+gemini-flow chat -m gemini-3-pro -c /path/to/user_cookies "用繁中回覆一句：測試成功"
+gemini-flow chat -m gemini-3-flash -c /path/to/user_cookies "用繁中回覆一句：測試成功"
 ```
 
 Debug mode (prints token/response previews):
 
 ```bash
-python cli.py chat --debug -c user_cookies "hello"
+gemini-flow chat --debug -c /path/to/user_cookies "hello"
 ```
 
 ### 多轮对话模式 (Multi-turn CLI)
@@ -35,7 +60,7 @@ python cli.py chat --debug -c user_cookies "hello"
 不带初始 prompt 启动，进入交互式 REPL，支持多轮上下文记忆：
 
 ```bash
-python cli.py chat -c user_cookies
+gemini-flow chat -c /path/to/user_cookies
 ```
 
 启动后在 `You:` 提示符下输入每一轮的提问。输入 `exit` 或 `quit` 结束会话：
@@ -58,7 +83,7 @@ You: quit
 Start an HTTP server:
 
 ```bash
-python server.py --host 127.0.0.1 --port 8000
+gemini-flow-server --host 127.0.0.1 --port 8000
 ```
 
 Health check:
@@ -66,6 +91,39 @@ Health check:
 ```bash
 curl http://127.0.0.1:8000/health
 ```
+
+### 同步 Cookie
+
+服务端支持通过接口触发一次 Chrome cookie 导出：
+
+```bash
+curl -X POST http://127.0.0.1:8000/sync-cookies \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+如果未在请求体中传 `output_dir`，会默认使用环境变量 `GEMINI_FLOW_COOKIE_SYNC_DIR`。
+
+也可以显式指定导出目录和 profile：
+
+```bash
+curl -X POST http://127.0.0.1:8000/sync-cookies \
+  -H "Content-Type: application/json" \
+  -d '{
+    "output_dir": "user_cookies",
+    "output_filename": "auth_Gemini.json",
+    "profile_directory": "Profile 1"
+  }'
+```
+
+可选字段：
+- `output_dir`: 导出目录，未传时回退到 `GEMINI_FLOW_COOKIE_SYNC_DIR`
+- `output_filename`: 导出文件名，默认 `auth_Gemini.json`
+- `chrome_user_data_dir`: Chrome User Data 根目录
+- `profile_directory`: 指定 profile，例如 `Default` 或 `Profile 1`
+- `debug`: 是否输出调试信息
+
+返回值会包含最终导出的 `output_path` 和实际使用的 `profile_directory`。
 
 ### 单轮 Chat（返回完整文本）
 
@@ -140,6 +198,48 @@ streamlit run app.py
 
 The cookies directory should contain one or more `*.json` files exported from Chrome/extensions.
 Each file must be a JSON list of objects including at least: `domain`, `name`, `value`.
+
+### 浏览器 Cookie 同步
+
+可以通过环境变量 `GEMINI_FLOW_COOKIE_SYNC_DIR` 指定一个“浏览器 Cookie 同步目录”。
+程序在每次读取 cookies 前，会先把该目录下的 `*.json` 文件同步到当前运行使用的 `cookies_dir`（例如默认的 `user_cookies`）。
+
+```bash
+export GEMINI_FLOW_COOKIE_SYNC_DIR=/path/to/browser-cookie-sync
+gemini-flow chat -c /path/to/user_cookies "hello"
+```
+
+说明：
+- 同步源目录只读取顶层的 `*.json` 文件。
+- 如果目标目录里已存在同名文件，只有源文件更新后才会覆盖。
+- 未设置该环境变量时，保持当前行为不变。
+
+### 从 Chrome 导出 Cookie
+
+可以直接从当前活跃的 Chrome profile 导出 Gemini 所需 cookies：
+
+```bash
+export GEMINI_FLOW_COOKIE_SYNC_DIR=/path/to/browser-cookie-sync
+gemini-flow export-cookies
+```
+
+也可以显式指定导出目录：
+
+```bash
+gemini-flow export-cookies --output-dir /path/to/user_cookies
+```
+
+可选参数：
+- `--output-filename` 自定义导出文件名，默认 `auth_Gemini.json`
+- `--chrome-user-data-dir` 指定 Chrome User Data 根目录
+- `--profile-directory` 指定 profile，例如 `Default` 或 `Profile 1`
+
+说明：
+- 未传 `--output-dir` 时，默认读取 `GEMINI_FLOW_COOKIE_SYNC_DIR`
+- 如果两者都没有提供，命令会直接报错
+- 当前实现按 macOS Chrome 目录结构读取活跃 profile
+
+图片输出目录仍可通过 `GEMINI_FLOW_IMAGE_DIR` 指定。
 
 ## Notes
 - If you see `SNlM0e token not found`, your cookies are likely expired.

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import base64
-import os
 import re
 import sys
 import time
@@ -12,6 +11,7 @@ import aiohttp
 
 from ..providers.base import ChatProvider
 from ..types import AsyncTextStream, Cookies, MissingAuthError, RequestError, TokenFetchError, ChatSession
+from ..config import get_image_output_dir
 from .protocol import (
     DEFAULT_HEADERS,
     GEMINI_BASE_URL,
@@ -135,15 +135,6 @@ class GeminiWebProvider(ChatProvider):
                     return True
             return False
 
-        def _get_image_output_dir() -> Path:
-            configured = os.environ.get("GEMINI_FLOW_IMAGE_DIR")
-            base = Path(configured) if configured else Path("output") / "image"
-            out = base.expanduser()
-            if not out.is_absolute():
-                out = (Path.cwd() / out).resolve()
-            out.mkdir(parents=True, exist_ok=True)
-            return out
-
         async def _save_image_candidate(
             *,
             client: aiohttp.ClientSession,
@@ -198,7 +189,7 @@ class GeminiWebProvider(ChatProvider):
             last_content = ""
             final_image_candidate: Optional[str] = None
             fallback_image_candidate: Optional[str] = None
-            out_dir = _get_image_output_dir() if is_image_model else Path.cwd()
+            out_dir = get_image_output_dir() if is_image_model else Path.cwd()
             out_prefix = f"gemini_{model}_{int(time.time())}"
             out_index = 0
 

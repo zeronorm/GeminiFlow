@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Dict
 
+from .config import sync_cookie_exports
 from .types import Cookies, MissingAuthError
 
 
@@ -64,6 +65,8 @@ def _pick_google_cookies(cookies_by_domain: Dict[str, Cookies]) -> Cookies:
 
 
 def load_google_cookies(cookies_dir: Path) -> Cookies:
+    sync_cookie_exports(cookies_dir=cookies_dir)
+
     if not cookies_dir.exists() or not cookies_dir.is_dir():
         raise FileNotFoundError(f"cookies dir not found: {cookies_dir}")
 

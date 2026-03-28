@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gemini-flow"
+version = "0.1.0"
+description = "Gemini web(cookie) client with multi-turn chat support"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "aiohttp>=3.9",
+    "aiohttp_cors>=0.7",
+    "playwright>=1.49",
+]
+
+[project.optional-dependencies]
+ui = [
+    "requests>=2.31",
+    "streamlit>=1.32",
+]
+
+[project.scripts]
+gemini-flow = "gemini_flow.cli_app:main"
+gemini-flow-server = "gemini_flow.server_app:main"
+
+[tool.setuptools.packages.find]
+include = ["gemini_flow*"]

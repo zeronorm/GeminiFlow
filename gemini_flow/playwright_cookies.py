@@ -46,6 +46,9 @@ async def export_gemini_cookies_with_playwright_async(
     profile_dir: Path,
     headless: bool,
     browser_channel: Optional[str] = None,
+    profile_directory: Optional[str] = None,
+    navigate_url: Optional[str] = GEMINI_URL,
+    require_login_check: bool = True,
     debug: bool = False,
 ) -> PlaywrightCookieRefreshResult:
     """Async version of cookie export.
@@ -71,15 +74,21 @@ async def export_gemini_cookies_with_playwright_async(
         }
         if browser_channel:
             launch_kwargs["channel"] = browser_channel
+        if profile_directory:
+            launch_kwargs["args"] = [f"--profile-directory={profile_directory}"]
 
         ctx = await p.chromium.launch_persistent_context(**launch_kwargs)
         try:
             page = await ctx.new_page()
-            await page.goto(GEMINI_URL, wait_until="domcontentloaded")
+            if navigate_url:
+                await page.goto(navigate_url, wait_until="domcontentloaded")
 
             cookie_export = await ctx.cookies()
             has_cookie = _has_required_cookie(cookie_export)
-            logged_in = has_cookie and not _looks_like_login_redirect(page.url)
+            if require_login_check:
+                logged_in = has_cookie and not _looks_like_login_redirect(page.url)
+            else:
+                logged_in = has_cookie
 
             if debug:
                 print(
@@ -127,6 +136,7 @@ async def ensure_playwright_cookies(
                 profile_dir=profile_dir,
                 headless=headless,
                 browser_channel=browser_channel,
+                profile_directory=None,
                 debug=debug,
             )
         except Exception as e:
