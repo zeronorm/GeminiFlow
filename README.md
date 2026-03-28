@@ -50,6 +50,30 @@ text = client.chat("用繁中回覆一句：測試成功", chat_session=session)
 app = create_app()
 ```
 
+如果你更偏好整包导入，也可以直接使用 `import gemini_flow`：
+
+```python
+import gemini_flow
+
+cookies_path = gemini_flow.export_cookies(output_dir="user_cookies")
+
+client = gemini_flow.Gemini(cookies_dir="user_cookies")
+session = gemini_flow.ChatSession()
+
+text = client.chat("用繁中回覆一句：測試成功", chat_session=session)
+app = gemini_flow.create_app()
+```
+
+这种写法适合在业务代码里统一通过 `gemini_flow.xxx` 访问顶层 API。当前包在顶层导出了这些常用对象：
+
+- `gemini_flow.Gemini`
+- `gemini_flow.ChatSession`
+- `gemini_flow.export_cookies`
+- `gemini_flow.aexport_cookies`
+- `gemini_flow.create_app`
+- `gemini_flow.create_server_app`
+- `gemini_flow.serve`
+
 异步接口：
 
 ```python
@@ -62,6 +86,24 @@ text = await client.achat("hello")
 
 await serve(host="127.0.0.1", port=8000)
 ```
+
+使用整包导入时，对应的异步写法如下：
+
+```python
+import gemini_flow
+
+await gemini_flow.aexport_cookies(output_dir="user_cookies")
+
+client = gemini_flow.Gemini(cookies_dir="user_cookies")
+text = await client.achat("hello")
+
+await gemini_flow.serve(host="127.0.0.1", port=8000)
+```
+
+注意：
+
+- `gemini_flow.export_cookies(...)` 和 `Gemini.chat(...)` 只能在同步上下文中调用
+- 如果当前代码运行在事件循环里，例如 `async def`、FastAPI、Jupyter，请改用 `await gemini_flow.aexport_cookies(...)` 和 `await client.achat(...)`
 
 ## Run
 
